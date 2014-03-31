@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import json
 from lxml import etree
 
 ZOOM = [
@@ -25,6 +26,8 @@ ZOOM = [
     1066,
     533
 ]
+
+DEFAULT_ZOOM_LEVELS = range(10, 21)
 
 
 class Styles(list):
@@ -96,8 +99,6 @@ class Styles(list):
     def visible_at_zoom_level(self, zoom):
         zmin, zmax = self.zoom_limits(zoom)
 
-        print zmin, zmax
-
         return self.find_by_scale(zmin, zmax)
 
 
@@ -133,8 +134,40 @@ class Layers(list):
         return new_layers
 
 
+def make_range(interval_str):
+    ranges = (x.split("-") for x in interval_str.split(","))
+    interval = [i for r in ranges for i in range(int(r[0]), int(r[-1]) + 1)]
+    return [i for i in interval if i in DEFAULT_ZOOM_LEVELS]
+
 if __name__ == '__main__':
-    with open('mapnik.xml', 'r') as infile:
+
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Process some integers.')
+    parser.add_argument('-x', '--xml',
+                        dest='input_xml',
+                        default='mapnik.xml',
+                        help='Mapnik xml file [default: mapnik.xml]'
+                        )
+    parser.add_argument('-z', '--zoom-levels',
+                        dest='zoom_levels',
+                        default=DEFAULT_ZOOM_LEVELS,
+                        help='Zoom levels to be processed [default: 10-20]'
+                        )
+
+    parser.add_argument('-o', '--outfile-prefix',
+                        dest='prefix',
+                        default='zoom_',
+                        help='Prefix for the output files [default: zoom_]'
+                        )
+
+    args = parser.parse_args()
+
+    zoom_levels = []
+    if args.zoom_levels:
+        zoom_levels = make_range(args.zoom_levels)
+
+    with open(args.input_xml, 'r') as infile:
         text = infile.read()
 
     root = etree.fromstring(text)
@@ -147,7 +180,6 @@ if __name__ == '__main__':
 
         for rule in style.iterchildren():
             if rule.tag != 'Rule':
-                print 'Not Rule'
                 import pdb
                 pdb.set_trace()
 
@@ -180,6 +212,14 @@ if __name__ == '__main__':
                     el_layer['datasources'].append(el_parameter)
 
         layers.append(el_layer)
+
+    for zlev in zoom_levels:
+        styles_zoom = styles.visible_at_zoom_level(zlev)
+        layers_zoom = layers.with_style([s['name'] for s in styles_zoom])
+
+        filename = args.prefix + str(zlev) + '.json'
+        with open(filename, 'w+') as outfile:
+            json.dump(layers_zoom, outfile)
 
     import pdb
     pdb.set_trace()
