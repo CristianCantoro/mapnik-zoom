@@ -220,6 +220,3 @@ if __name__ == '__main__':
         filename = args.prefix + str(zlev) + '.json'
         with open(filename, 'w+') as outfile:
             json.dump(layers_zoom, outfile)
-
-    import pdb
-    pdb.set_trace()
